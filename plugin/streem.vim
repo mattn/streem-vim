@@ -107,10 +107,6 @@ function! s:expr_string(value) abort
   return {'type': 'string', 'value': eval(a:value) }
 endfunction
 
-function! s:expr_number(value) abort
-  return {'type': 'string', 'value': a:value }
-endfunction
-
 let s:level = 0
 
 function! s:parse_node(ctx, node) abort
