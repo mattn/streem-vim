@@ -5,12 +5,12 @@ let s:tbl = [
 \    ],
 \  ],
 \  ['stmt',
-\    [ 
+\    [
 \      { 'type': 'node', 'match': ['expr', ['|', 'expr']], 'eval': 's:stmt' },
 \    ],
 \  ],
 \  ['expr',
-\    [ 
+\    [
 \      { 'type': 'node', 'match': ['expr_node', 'sp', '==', 'sp', 'expr_node'], 'eval': 's:op_eqeq' },
 \      { 'type': 'node', 'match': ['if', 'sp', 'expr', 'sp', 'end'], 'eval': 's:expr_if' },
 \      { 'type': 'node', 'match': ['ident', '(', ')'], 'eval': 's:op_call' },
@@ -22,7 +22,7 @@ let s:tbl = [
 \    ],
 \  ],
 \  ['expr_node',
-\    [ 
+\    [
 \      { 'type': 'node', 'match': ['{', 'sp', '|', 'ident', '|', 'sp', '}'], 'eval': 's:expr_func' },
 \      { 'type': 'node', 'match': ['{', 'sp', '|', 'ident', '|', 'sp', 'stmts', 'sp', '}'], 'eval': 's:expr_func' },
 \      { 'type': 'node', 'match': ['ident'], 'eval': 's:expr' },
