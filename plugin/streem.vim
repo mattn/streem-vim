@@ -247,6 +247,7 @@ function! s:invoke(node, env) abort
       let a:env['vars'][name] = l
       let r = s:invoke(a:node.value[1], a:env)
       call add(res, r)
+      unlet r
     endfor
     return res
   elseif a:node.type ==# 'ident'
