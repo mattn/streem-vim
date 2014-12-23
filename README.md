@@ -1,6 +1,6 @@
 # streem-vim
 
-This is inspired by https://github.com/matz/streem
+Vim script implementation of [streem](https://github.com/matz/streem)
 
 ## Usage
 
