@@ -121,39 +121,39 @@ function! s:parse_node(ctx, node) abort
         return ''
       endif
       let pos = a:ctx.pos
-      call s:debug(repeat(' ', s:level), "TRY", string(a:node), string(a:ctx.str[a:ctx.pos:]))
+      call s:debug(repeat(' ', s:level), 'TRY', string(a:node), string(a:ctx.str[a:ctx.pos:]))
       for item in s:tbl
         if a:node == item[0]
           for n in item[1]
             let a:ctx.pos = pos
-            if n.type == 'string'
+            if n.type ==# 'string'
               if stridx(a:ctx.str[a:ctx.pos:], n.match) == 0
                 let a:ctx.pos += len(n.match)
-                call s:debug(repeat(' ', s:level), "HIT", string(n))
-                if n.eval != ''
+                call s:debug(repeat(' ', s:level), 'HIT', string(n))
+                if n.eval !=# ''
                   return call(n.eval, [n.match])
                 else
                   return {}
                 endif
               endif
-            elseif n.type == 'regexp'
-              if a:ctx.str[a:ctx.pos:] =~ '^' . n.match
+            elseif n.type ==# 'regexp'
+              if a:ctx.str[a:ctx.pos:] =~# '^' . n.match
                 let m = matchstr(a:ctx.str[a:ctx.pos:], '^' . n.match)
                 let a:ctx.pos += len(m)
-                call s:debug(repeat(' ', s:level), "HIT", string(n))
-                if n.eval != ''
+                call s:debug(repeat(' ', s:level), 'HIT', string(n))
+                if n.eval !=# ''
                   return call(n.eval, [m])
                 else
                   return {}
                 endif
               endif
-            elseif n.type == 'node'
+            elseif n.type ==# 'node'
               let s = s:parse_node(a:ctx, n)
               if type(s) == 3
-                call s:debug(repeat(' ', s:level), "HIT", string(n))
+                call s:debug(repeat(' ', s:level), 'HIT', string(n))
                 return call(n.eval, [s])
               elseif type(s) == 4
-                call s:debug(repeat(' ', s:level), "HIT", string(n))
+                call s:debug(repeat(' ', s:level), 'HIT', string(n))
                 return s
               endif
               unlet s
@@ -161,7 +161,7 @@ function! s:parse_node(ctx, node) abort
           endfor
         endif
       endfor
-      call s:debug(repeat(' ', s:level), "NG ", string(a:node), string(a:ctx.str[a:ctx.pos:]))
+      call s:debug(repeat(' ', s:level), 'NG ', string(a:node), string(a:ctx.str[a:ctx.pos:]))
       "let a:ctx.pos = pos
       return ''
     elseif type(a:node.match) == 3
@@ -176,11 +176,11 @@ function! s:parse_node(ctx, node) abort
           while 1
             let nn = n[j % len(n)]
             let vv = s:parse_node(a:ctx, nn)
-            if type(vv) == 1 && vv == ''
+            if type(vv) ==# 1 && vv ==# ''
               return value
             endif
             call add(value, vv)
-            if a:ctx.str[a:ctx.pos:] == ''
+            if a:ctx.str[a:ctx.pos:] ==# ''
               return value
             endif
             unlet vv
@@ -189,7 +189,7 @@ function! s:parse_node(ctx, node) abort
           return value
         endif
         let v = s:parse_node(a:ctx, n)
-        if type(v) == 1 && v == ''
+        if type(v) ==# 1 && v ==# ''
           let a:ctx.pos = pos
           return ''
         endif
@@ -197,7 +197,7 @@ function! s:parse_node(ctx, node) abort
         unlet v
         let i += 1
         unlet n
-        if a:ctx.str[a:ctx.pos:] == ''
+        if a:ctx.str[a:ctx.pos:] ==# ''
           if i < len(a:node.match) - 1
             let a:ctx.pos = pos
             return ''
@@ -219,21 +219,21 @@ function! s:parse_node(ctx, node) abort
 endfunction
 
 function! s:invoke(node, env) abort
-  if a:node.type == 'stmts'
+  if a:node.type ==# 'stmts'
     let x = 0
     for stmt in a:node.value
       unlet x
       let x = s:invoke(stmt, a:env)
     endfor
     return x
-  elseif a:node.type == 'stmt'
+  elseif a:node.type ==# 'stmt'
     let x = 0
     for stmt in a:node.value
       unlet x
       let x = s:invoke(stmt, a:env)
     endfor
     return x
-  elseif a:node.type == 'expr'
+  elseif a:node.type ==# 'expr'
     " streem
     let res = s:invoke(a:node.value[0], a:env)
     let a:env['input'] = res
@@ -243,7 +243,7 @@ function! s:invoke(node, env) abort
       let a:env['input'] = res
     endfor
     return res
-  elseif a:node.type == 'func'
+  elseif a:node.type ==# 'func'
     let name = a:node.value[0].value
     let lines = a:env['input']
     let res = []
@@ -253,22 +253,22 @@ function! s:invoke(node, env) abort
       call add(res, r)
     endfor
     return res
-  elseif a:node.type == 'ident'
-    if a:node.value == 'STDIN'
+  elseif a:node.type ==# 'ident'
+    if a:node.value ==# 'STDIN'
       return getline(1, '$')
     endif
-    if a:node.value == 'STDOUT'
+    if a:node.value ==# 'STDOUT'
       echo join(a:env['input'], "\n")
     endif
     return a:node.value
-  elseif a:node.type == 'call'
+  elseif a:node.type ==# 'call'
     return call(a:env[a:node.value[0].value], a:node.value[1].value, a:env)
-  elseif a:node.type == 'op_let'
+  elseif a:node.type ==# 'op_let'
     let name = a:node.value[0].value
     let value = s:invoke(a:node.value[1], a:env)
     let a:env['vars'][name] = value
     return value
-  elseif a:node.type == 'op_plus'
+  elseif a:node.type ==# 'op_plus'
     let name = a:node.value[0].value
     let value = s:invoke(a:node.value[1], a:env)
     if type(value) != 1
