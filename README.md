@@ -25,6 +25,11 @@ baz Matz
 
 put streem-vim into your `~/.vim/bundle`.
 
+## TODO
+
+* concurrency
+* missing syntaxs (if, for, etc)
+
 ## License
 
 MIT
