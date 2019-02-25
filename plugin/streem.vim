@@ -38,7 +38,7 @@ let s:tbl = [
 \  ['|', [{ 'type': 'string', 'match': '|', 'eval': '' }]],
 \  ['if', [{ 'type': 'string', 'match': 'if', 'eval': '' }]],
 \  ['end', [{ 'type': 'string', 'match': 'end', 'eval': '' }]],
-\  ['sp', [{ 'type': 'regexp', 'match': '[ \t]*', 'eval': '' }]],
+\  ['sp', [{ 'type': 'regexp', 'match': '[ \t\\r\\n]*', 'eval': '' }]],
 \  ['lb', [{ 'type': 'regexp', 'match': '[ \t]*[\\r\n;]\+[ \t]*', 'eval': '' }]],
 \  ['{', [{ 'type': 'string', 'match': '{', 'eval': '' }]],
 \  ['}', [{ 'type': 'string', 'match': '}', 'eval': '' }]],
@@ -296,7 +296,11 @@ endfunction
 
 function! s:streem(line1, line2, value) abort
   "echo a:line1 a:line2 a:value
-  let env = {'vars': {}, 'input': ['1']}
+  if mode() =~# '[vV]'
+    let env = {'vars': {}, 'input': getline(a:line1, a:line2)}
+  else
+    let env = {'vars': {}, 'input': ['']}
+  endif
   function! env.map(x) abort
     return map()
   endfunction
@@ -323,5 +327,9 @@ command! -range -nargs=* Streem call s:streem(<line1>, <line2>, <q-args>)
 "echo s:streem(1, 1, "x+='3'")
 "echo s:streem(1, 1, "x")
 "echo s:streem(1, 1, "STDIN")
+
+Streem {|x|
+\  x += "foo"
+\ } | STDOUT
 
 " vim:set et
