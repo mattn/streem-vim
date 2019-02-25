@@ -38,7 +38,7 @@ let s:tbl = [
 \  ['|', [{ 'type': 'string', 'match': '|', 'eval': '' }]],
 \  ['if', [{ 'type': 'string', 'match': 'if', 'eval': '' }]],
 \  ['end', [{ 'type': 'string', 'match': 'end', 'eval': '' }]],
-\  ['sp', [{ 'type': 'regexp', 'match': '[ \t\\r\\n]*', 'eval': '' }]],
+\  ['sp', [{ 'type': 'regexp', 'match': '[ \t]*', 'eval': '' }]],
 \  ['lb', [{ 'type': 'regexp', 'match': '[ \t]*[\\r\n;]\+[ \t]*', 'eval': '' }]],
 \  ['{', [{ 'type': 'string', 'match': '{', 'eval': '' }]],
 \  ['}', [{ 'type': 'string', 'match': '}', 'eval': '' }]],
@@ -258,10 +258,12 @@ function! s:invoke(node, env) abort
     endif
     if a:node.value ==# 'STDOUT'
       echo join(a:env['input'], "\n")
+      return ''
     endif
-    return a:node.value
-  elseif a:node.type ==# 'call'
-    return call(a:env[a:node.value[0].value], a:node.value[1].value, a:env)
+    return a:env.vars[a:node.value]
+  elseif a:node.type ==# 'op_call'
+    let args = map(deepcopy(a:node.value[1].value), 's:invoke(v:val, a:env)')
+    return call(a:env[a:node.value[0].value], args, a:env)
   elseif a:node.type ==# 'op_let'
     let name = a:node.value[0].value
     let value = s:invoke(a:node.value[1], a:env)
@@ -304,8 +306,9 @@ function! s:streem(line1, line2, value) abort
   function! env.map(x) abort
     return map()
   endfunction
-  function! env.print(x) abort
-    echo s:invoke(a:x, self)
+  function! env.print(...) abort
+    echo join(a:000, ' ')
+    return a:000
   endfunction
   let ast = s:parse(a:value)
   return s:invoke(ast, env)
@@ -329,7 +332,8 @@ command! -range -nargs=* Streem call s:streem(<line1>, <line2>, <q-args>)
 "echo s:streem(1, 1, "STDIN")
 
 Streem {|x|
-\  x += "foo"
+\  x += "foo";
+\  print(x)
 \ } | STDOUT
 
 " vim:set et
