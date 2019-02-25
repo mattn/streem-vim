@@ -12,7 +12,7 @@ let s:tbl = [
 \  ['expr',
 \    [
 \      { 'type': 'node', 'match': ['expr_node', 'sp', '==', 'sp', 'expr_node'], 'eval': 's:op_eqeq' },
-\      { 'type': 'node', 'match': ['if', 'sp', 'expr', 'sp', 'end'], 'eval': 's:expr_if' },
+\      { 'type': 'node', 'match': ['if', 'sp', 'expr', 'lb', 'end'], 'eval': 's:expr_if' },
 \      { 'type': 'node', 'match': ['ident', '(', ')'], 'eval': 's:op_call' },
 \      { 'type': 'node', 'match': ['ident', '(', 'expr_node', ')'], 'eval': 's:op_call' },
 \      { 'type': 'node', 'match': ['ident', 'sp', '=', 'sp', 'expr_node'], 'eval': 's:op_let' },
@@ -245,20 +245,27 @@ function! s:invoke(node, env) abort
     let name = a:node.value[0].value
     let lines = a:env['input']
     let res = []
-    for l in lines
-      let a:env['vars'][name] = l
-      let r = s:invoke(a:node.value[1], a:env)
-      call add(res, r)
-      unlet r
-    endfor
+    if len(a:node.value) > 1
+      for l in lines
+        let a:env['vars'][name] = l
+        let r = s:invoke(a:node.value[1], a:env)
+        call add(res, r)
+        unlet r
+      endfor
+    else
+      let res = lines
+    endif
     return res
   elseif a:node.type ==# 'ident'
     if a:node.value ==# 'STDIN'
-      return getline(1, '$')
+      if mode() =~# '[vV]'
+        return getline(a:line1, a:line2)
+      endif
+      return ['']
     endif
     if a:node.value ==# 'STDOUT'
       echo join(a:env['input'], "\n")
-      return ''
+      return []
     endif
     return a:env.vars[a:node.value]
   elseif a:node.type ==# 'op_call'
@@ -277,7 +284,11 @@ function! s:invoke(node, env) abort
       unlet value
       let value = v
     endif
-    let a:env['vars'][name] .= value
+    if has_key(a:env['vars'], 'name')
+      let a:env['vars'][name] .= value
+    else
+      let a:env['vars'][name] = value
+    endif
     return a:env['vars'][name]
   endif
   return a:node.value
@@ -318,22 +329,21 @@ command! -range -nargs=* Streem call s:streem(<line1>, <line2>, <q-args>)
 
 "Streem {|x| x += "foo"} | STDOUT
 
-"echo s:streem(1, 1, "STDOUT|print('hello world')|STDOUT")
-"echo s:streem(1, 1, "STDIN|{|x|x+=3}|STDOUT")
-"echo s:streem(1, 1, "STDIN | {|x|} | STDOUT")
-"echo s:streem(1, 1, "STDIN | {|x| x += 1 } | STDOUT")
-"echo s:streem(1, 1, "if x == 2 end")
-"echo s:streem(1, 1, "print(1) | STDOUT")
-"echo s:streem(1, 1, "x == 2")
-"echo s:streem(1, 1, "{|x|}")
-"echo s:streem(1, 1, "STDIN | 3 | 4")
-"echo s:streem(1, 1, "x+='3'")
-"echo s:streem(1, 1, "x")
-"echo s:streem(1, 1, "STDIN")
+"call s:streem(1, 1, "STDIN|{|x|print('hello world')}|STDOUT")
+"call s:streem(1, 1, "STDIN|{|x|x+=3}|STDOUT")
+"call s:streem(1, 1, "STDIN | {|x|} | STDOUT")
+"call s:streem(1, 1, "STDIN | {|x| x += 1 } | STDOUT")
+"call s:streem(1, 1, "{|x| if x == 2; end}")
+"call s:streem(1, 1, "{|x|x = 2}")
+"call s:streem(1, 1, "{|x|}")
+"call s:streem(1, 1, "STDIN | 3 | 4")
+"call s:streem(1, 1, "x+='3'")
+"call s:streem(1, 1, "x")
+"call s:streem(1, 1, "STDIN")
 
-Streem {|x|
-\  x += "foo";
-\  print(x)
-\ } | STDOUT
+"Streem {|x|
+"\  x += "foo";
+"\  print(x)
+"\ } | STDOUT
 
 " vim:set et
