@@ -42,6 +42,8 @@ let s:tbl = [
 \  ['lb', [{ 'type': 'regexp', 'match': '[ \t]*[\\r\n;]\+[ \t]*', 'eval': '' }]],
 \  ['{', [{ 'type': 'string', 'match': '{', 'eval': '' }]],
 \  ['}', [{ 'type': 'string', 'match': '}', 'eval': '' }]],
+\  ['(', [{ 'type': 'string', 'match': '(', 'eval': '' }]],
+\  [')', [{ 'type': 'string', 'match': ')', 'eval': '' }]],
 \]
 
 let s:debug = 0
@@ -294,7 +296,7 @@ endfunction
 
 function! s:streem(line1, line2, value) abort
   "echo a:line1 a:line2 a:value
-  let env = {'vars': {}, 'input': getline(a:line1, a:line2)}
+  let env = {'vars': {}, 'input': ['1']}
   function! env.map(x) abort
     return map()
   endfunction
