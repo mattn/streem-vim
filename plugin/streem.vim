@@ -2,6 +2,7 @@ let s:tbl = [
 \  ['stmts',
 \    [
 \      { 'type': 'node', 'match': ['stmt', ['lb', 'stmt']], 'eval': 's:stmts' },
+\      { 'type': 'node', 'match': ['sb'], 'eval': 's:stmt' },
 \    ],
 \  ],
 \  ['stmt',
@@ -11,12 +12,13 @@ let s:tbl = [
 \  ],
 \  ['expr',
 \    [
-\      { 'type': 'node', 'match': ['expr_node', 'sp', '==', 'sp', 'expr_node'], 'eval': 's:op_eqeq' },
 \      { 'type': 'node', 'match': ['if', 'sp', 'expr', 'lb', 'end'], 'eval': 's:expr_if' },
+\      { 'type': 'node', 'match': ['if', 'sp', 'expr', 'lb', 'stmts', 'sb', 'end'], 'eval': 's:expr_if' },
 \      { 'type': 'node', 'match': ['ident', '(', ')'], 'eval': 's:op_call' },
 \      { 'type': 'node', 'match': ['ident', '(', 'expr_node', ')'], 'eval': 's:op_call' },
 \      { 'type': 'node', 'match': ['ident', 'sp', '=', 'sp', 'expr_node'], 'eval': 's:op_let' },
 \      { 'type': 'node', 'match': ['ident', 'sp', '+=', 'sp', 'expr_node'], 'eval': 's:op_plus' },
+\      { 'type': 'node', 'match': ['expr_node', 'sp', '==', 'sp', 'expr_node'], 'eval': 's:op_eqeq' },
 \      { 'type': 'node', 'match': ['expr_node', ['sp', '|', 'sp', 'expr_node']], 'eval': 's:expr' },
 \      { 'type': 'node', 'match': ['expr_node'], 'eval': 's:expr' },
 \    ],
@@ -24,29 +26,31 @@ let s:tbl = [
 \  ['expr_node',
 \    [
 \      { 'type': 'node', 'match': ['{', 'sp', '|', 'ident', '|', 'sp', '}'], 'eval': 's:expr_func' },
-\      { 'type': 'node', 'match': ['{', 'sp', '|', 'ident', '|', 'sp', 'stmts', 'sp', '}'], 'eval': 's:expr_func' },
+\      { 'type': 'node', 'match': ['{', 'sp', '|', 'ident', '|', 'lb', 'stmts', 'sb', '}'], 'eval': 's:expr_func' },
 \      { 'type': 'node', 'match': ['ident'], 'eval': 's:expr' },
 \      { 'type': 'node', 'match': ['number'], 'eval': 's:expr' },
 \      { 'type': 'node', 'match': ['string'], 'eval': 's:expr' },
 \    ],
 \  ],
+\  ['if', [{ 'type': 'string', 'match': 'if', 'eval': '' }]],
+\  ['end', [{ 'type': 'string', 'match': 'end', 'eval': '' }]],
 \  ['string', [{ 'type': 'regexp', 'match': '\("[^"]*"\|''[^'']*''\)', 'eval': 's:expr_string' }]],
 \  ['number', [{ 'type': 'regexp', 'match': '[0-9]\+', 'eval': 's:expr_number' }]],
 \  ['ident', [{ 'type': 'regexp', 'match': '[a-zA-Z][a-zA-Z0-9]*', 'eval': 's:expr_ident' }]],
 \  ['+=', [{ 'type': 'string', 'match': '+=', 'eval': '' }]],
 \  ['=', [{ 'type': 'string', 'match': '=', 'eval': '' }]],
+\  ['==', [{ 'type': 'string', 'match': '==', 'eval': '' }]],
 \  ['|', [{ 'type': 'string', 'match': '|', 'eval': '' }]],
-\  ['if', [{ 'type': 'string', 'match': 'if', 'eval': '' }]],
-\  ['end', [{ 'type': 'string', 'match': 'end', 'eval': '' }]],
 \  ['sp', [{ 'type': 'regexp', 'match': '[ \t]*', 'eval': '' }]],
-\  ['lb', [{ 'type': 'regexp', 'match': '[ \t]*[\\r\n;]\+[ \t]*', 'eval': '' }]],
+\  ['sb', [{ 'type': 'regexp', 'match': '[ \t\r\n;]*', 'eval': '' }]],
+\  ['lb', [{ 'type': 'regexp', 'match': '[ \t]*[\r\n;]\+[ \t]*', 'eval': '' }]],
 \  ['{', [{ 'type': 'string', 'match': '{', 'eval': '' }]],
 \  ['}', [{ 'type': 'string', 'match': '}', 'eval': '' }]],
 \  ['(', [{ 'type': 'string', 'match': '(', 'eval': '' }]],
 \  [')', [{ 'type': 'string', 'match': ')', 'eval': '' }]],
 \]
 
-let s:debug = 0
+let s:debug = 1
 
 if s:debug
   function! s:debug(...) abort
@@ -109,23 +113,27 @@ function! s:expr_string(value) abort
   return {'type': 'string', 'value': eval(a:value) }
 endfunction
 
+function! s:nop(value) abort
+  return {}
+endfunction
+
 let s:level = 0
 
 function! s:parse_node(ctx, node) abort
   try
+    if a:ctx.pos ==# len(a:ctx.str)
+      return ''
+    endif
     let s:level += 1
-    if type(a:node) == 1
-      if a:ctx.pos == len(a:ctx.str)
-        return ''
-      endif
+    if type(a:node) ==# v:t_string
       let pos = a:ctx.pos
-      call s:debug(repeat(' ', s:level), 'TRY', string(a:node), string(a:ctx.str[a:ctx.pos:]))
+      call s:debug(repeat(' ', s:level), 'TRY', string(a:node), string(a:ctx.str[a:ctx.pos :]))
       for item in s:tbl
-        if a:node == item[0]
+        if a:node ==# item[0]
           for n in item[1]
             let a:ctx.pos = pos
             if n.type ==# 'string'
-              if stridx(a:ctx.str[a:ctx.pos:], n.match) == 0
+              if stridx(a:ctx.str[a:ctx.pos :], n.match) ==# 0
                 let a:ctx.pos += len(n.match)
                 call s:debug(repeat(' ', s:level), 'HIT', string(n))
                 if n.eval !=# ''
@@ -135,8 +143,8 @@ function! s:parse_node(ctx, node) abort
                 endif
               endif
             elseif n.type ==# 'regexp'
-              if a:ctx.str[a:ctx.pos:] =~# '^' . n.match
-                let m = matchstr(a:ctx.str[a:ctx.pos:], '^' . n.match)
+              if a:ctx.str[a:ctx.pos :] =~# '^' . n.match
+                let m = matchstr(a:ctx.str[a:ctx.pos :], '^' . n.match)
                 let a:ctx.pos += len(m)
                 call s:debug(repeat(' ', s:level), 'HIT', string(n))
                 if n.eval !=# ''
@@ -147,65 +155,62 @@ function! s:parse_node(ctx, node) abort
               endif
             elseif n.type ==# 'node'
               let s = s:parse_node(a:ctx, n)
-              if type(s) == 3
+              if type(s) ==# v:t_list
                 call s:debug(repeat(' ', s:level), 'HIT', string(n))
                 return call(n.eval, [s])
-              elseif type(s) == 4
+              elseif type(s) ==# v:t_dict
                 call s:debug(repeat(' ', s:level), 'HIT', string(n))
-                return s
+                return {}
               endif
               unlet s
             endif
           endfor
         endif
       endfor
-      call s:debug(repeat(' ', s:level), 'NG ', string(a:node), string(a:ctx.str[a:ctx.pos:]))
+      call s:debug(repeat(' ', s:level), 'NG ', string(a:node), string(a:ctx.str[a:ctx.pos :]))
       "let a:ctx.pos = pos
-      return ''
-    elseif type(a:node.match) == 3
+      return v:null
+    elseif type(a:node.match) ==# v:t_list
       let value = []
       let deep = []
       let pos = a:ctx.pos
       let i = 0
-      while i < len(a:node.match)
-        let n = a:node.match[i]
-        if type(n) == 3
-          let j = 0
-          while 1
-            let nn = n[j % len(n)]
+      for n in a:node.match
+        if type(n) ==# v:t_list
+          for nn in n
             let vv = s:parse_node(a:ctx, nn)
-            if type(vv) ==# 1 && vv ==# ''
-              return value
+            if type(vv) ==# v:t_string && vv ==# ''
+              let a:ctx.pos = pos
+              return ''
             endif
             call add(value, vv)
-            if a:ctx.str[a:ctx.pos:] ==# ''
-              return value
+            if a:ctx.str[a:ctx.pos :] ==# ''
+              let a:ctx.pos = pos
+              return ''
             endif
             unlet vv
-            let j += 1
-          endwhile
+          endfor
+          if len(value) < len(a:node.match)
+            let a:ctx.pos = pos
+            return ''
+          endif
           return value
+        else
+          let v = s:parse_node(a:ctx, n)
         endif
-        let v = s:parse_node(a:ctx, n)
-        if type(v) ==# 1 && v ==# ''
-          let a:ctx.pos = pos
-          return ''
+        if type(v) ==# v:t_none
+          break
         endif
         call add(value, v)
         unlet v
-        let i += 1
         unlet n
-        if a:ctx.str[a:ctx.pos:] ==# ''
-          if i < len(a:node.match) - 1
-            let a:ctx.pos = pos
-            return ''
-          else
-            return value
-          endif
+        if a:ctx.str[a:ctx.pos :] ==# ''
+		  return value
         endif
-      endwhile
-      if len(value) < len(a:node.match)
+      endfor
+      if len(value) < len(a:node.match) && type(a:node.match[len(value)]) != v:t_list
         let a:ctx.pos = pos
+        call s:debug(repeat(' ', s:level), 'NG ', string(a:node), string(a:ctx.str[a:ctx.pos :]))
         return ''
       endif
       return value
@@ -258,12 +263,10 @@ function! s:invoke(node, env) abort
     return res
   elseif a:node.type ==# 'ident'
     if a:node.value ==# 'STDIN'
-      if mode() =~# '[vV]'
-        return getline(a:line1, a:line2)
-      endif
-      return ['']
+      return a:env['input']
     endif
     if a:node.value ==# 'STDOUT'
+      let g:hoge = a:env['input']
       echo join(a:env['input'], "\n")
       return []
     endif
@@ -279,7 +282,7 @@ function! s:invoke(node, env) abort
   elseif a:node.type ==# 'op_plus'
     let name = a:node.value[0].value
     let value = s:invoke(a:node.value[1], a:env)
-    if type(value) != 1
+    if type(value) != v:t_string
       let v = string(value)
       unlet value
       let value = v
@@ -297,7 +300,7 @@ endfunction
 function! s:parse_tree(ctx) abort
   let stmts = s:parse_node(a:ctx, 'stmts')
   if a:ctx.pos < len(a:ctx.str)
-    throw a:ctx.str[a:ctx.pos:]
+    throw a:ctx.str[a:ctx.pos :]
   endif
   return stmts
 endfunction
@@ -314,12 +317,9 @@ function! s:streem(line1, line2, value) abort
   else
     let env = {'vars': {}, 'input': ['']}
   endif
-  function! env.map(x) abort
-    return map()
-  endfunction
   function! env.print(...) abort
     echo join(a:000, ' ')
-    return a:000
+    return ''
   endfunction
   let ast = s:parse(a:value)
   return s:invoke(ast, env)
@@ -329,17 +329,19 @@ command! -range -nargs=* Streem call s:streem(<line1>, <line2>, <q-args>)
 
 "Streem {|x| x += "foo"} | STDOUT
 
-"call s:streem(1, 1, "STDIN|{|x|print('hello world')}|STDOUT")
-"call s:streem(1, 1, "STDIN|{|x|x+=3}|STDOUT")
-"call s:streem(1, 1, "STDIN | {|x|} | STDOUT")
-"call s:streem(1, 1, "STDIN | {|x| x += 1 } | STDOUT")
-"call s:streem(1, 1, "{|x| if x == 2; end}")
-"call s:streem(1, 1, "{|x|x = 2}")
-"call s:streem(1, 1, "{|x|}")
-"call s:streem(1, 1, "STDIN | 3 | 4")
-"call s:streem(1, 1, "x+='3'")
-"call s:streem(1, 1, "x")
-"call s:streem(1, 1, "STDIN")
+call s:streem(1, 1, 'STDIN|{|x|print("hello world")}|STDOUT')
+"call s:streem(1, 1, 'STDIN|{|x|x+=3}|STDOUT')
+"call s:streem(1, 1, 'STDIN | {|x|} | STDOUT')
+"call s:streem(1, 1, 'STDIN | {|x| x += 1 } | STDOUT')
+"call s:streem(1, 1, '{|x| if 1;print(1);end;}')
+"call s:streem(1, 1, 'if 1;end')
+"call s:streem(1, 1, 'if 1;print(1);end')
+"call s:streem(1, 1, '{|x|x = 2}')
+"call s:streem(1, 1, '{|x|}')
+"call s:streem(1, 1, 'STDIN | 3 | 4')
+"call s:streem(1, 1, 'x+="3"')
+"call s:streem(1, 1, 'x') " ERR
+"call s:streem(1, 1, 'STDIN')
 
 "Streem {|x|
 "\  x += "foo";
